@@ -1,0 +1,45 @@
+name: Ritenta server Oracle
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # ogni ora; ogni giro prova per circa 50 minuti
+  workflow_dispatch:       # pulsante "Run workflow" per avviarlo subito
+
+permissions:
+  contents: read
+  actions: write           # serve solo per spegnersi da solo quando i server sono creati
+
+concurrency:
+  group: ritenta-oracle
+  cancel-in-progress: false
+
+jobs:
+  ritenta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installa
+        run: pip install -r requirements.txt
+
+      - name: Cerca posto su Oracle
+        id: ritenta
+        env:
+          ORACLE_CONFIG: ${{ secrets.ORACLE_CONFIG }}
+          ORACLE_CHIAVE: ${{ secrets.ORACLE_CHIAVE }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DURATA_MINUTI: ${{ vars.DURATA_MINUTI || '50' }}
+        run: python ritenta.py
+
+      - name: Tutti i server creati, spengo il ritentatore
+        if: steps.ritenta.outputs.fatto == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable "${{ github.workflow }}" --repo "${{ github.repository }}"
